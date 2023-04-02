@@ -13,10 +13,10 @@
 WINDOW *createa_newwin(int height, int width, int startX, int startY);
 void updateStatusWindow(char* path, char* name);
 void DestroyALL();
-bool updateLeftWindow(char* currentPath);
+bool updateLeftWindow(char* currentPath, bool needUpdate);
 int currentFilesLeft;
 int currentFilesRight; 
-
+bool checkUpPathIsFolder(char* currentPath);
 char* currentFiles1; // left window
 char* currentFiles2; // right window 
 char* currentFilesInFolders(char* nameFoldersPath, int numberFiles);
@@ -34,13 +34,16 @@ char* rightListNames[100];
 
 
 int cSEle; // current Selected Element;
+int currentLeftElementsInFolder;
+int currentRightElementsInFolder;
+char* cNamesSelected; 
+char* cwdLEFT;
 
+char* returnFilesNames(char* path, int number );
 
 int main (void){
 
    int ch;     
-  // WINDOW* my_winlos;
-  // WINDOW* my_winlos2;
    initscr();
    start_color();
    noecho();
@@ -59,21 +62,13 @@ int main (void){
    exit(1);
    
  }  else {
-   
- // attron(COLOR_PAIR(1));  
- // printw(" ok opens all "); // ok print red color 
- // attroff(COLOR_PAIR(1));  
-    
+       
   while( ( entry = readdir(folder)) )
   {
      files++;
      currentFilesLeft++;
      currentFilesRight++;
-     
-      
-     
-   //printw(" File %3d: %s\n ", files, entry->d_name);
-  }
+   }
 
    char *lStringArrayName[currentFilesLeft];
  
@@ -94,17 +89,14 @@ int main (void){
 
    int h, w, s1, s2;
    h = LINES - 4;  //2; // LINES - 2; // was 3
-  
    w = (COLS / 2) - 2;
    s1  = LINES / 2; 
-   //wprintw() 
- 
  
       // LINES 29 
       // COLUMNS 100   
       s2 = (COLS - w )/ 2;
-      printw( " my lines = %d ", LINES);
-      printw(" my COLUMNS = %d \n", COLS);   
+      //printw( " my lines = %d ", LINES);
+      //printw(" my COLUMNS = %d \n", COLS);   
       init_pair(2, COLOR_BLUE, COLOR_WHITE);
       init_pair(3, COLOR_RED, COLOR_CYAN);
       my_winlos = createa_newwin(h, w, 0, 1);
@@ -129,91 +121,123 @@ int main (void){
        wattron(my_winStatus, COLOR_PAIR(3));
        wrefresh(my_winStatus);
        wattroff(my_winStatus, COLOR_PAIR(3));     
-       char* myName = "Los";
-
-       // wprintw(my_winlos, "%d \n", 200);
-       // mvwprintw(my_winlos, 1, 2, "%d \n", 200);
     
-     char cwd[256];
-     if(getcwd(cwd, sizeof(cwd)) == NULL ){
+       char cwd[256];
+       if(getcwd(cwd, sizeof(cwd)) == NULL ){
        // no files 
-       exit(1);
+        exit(1);
       }   
 
       int currentFilesLeftWindow = currentNumberFilesInFolder(cwd);
-      //char* filesLeft = currentFilesInFolders(cwd, currentFilesLeftWindow);
- 
-      // printMyCurrent in folder's 
-   
-     // mvprintw(1, 2, "files in folders %d ", currentFilesLeftWindow);  // 11  
       
-   
-     // update left Window(); 
-     // update right Window();
- 
-      if(!updateLeftWindow(cwd)){
-        printf(" no create left window ! \n");
+      if(!updateLeftWindow(cwd, false)){
+        printw(" no create left window ! \n");
         exit(1);
     }
 
-      for(int i = 0; i < currentFilesLeftWindow; i++){
-  
-  
-        //if()
-    
-
-        
-      // mvprintw(2+i, 2, "%s", &filesLeft[i]);  
-     	 
-         //mvprintw(2, 2, "%s", &filesLeft[0]);
-    	 //mvprintw(3, 2, "%s", &filesLeft[1]);
-   	 //mvprintw(4, 2, "%s", &filesLeft[2]);
-   	 //mvprintw(5, 2, "%s", &filesLeft[3]);     
- 
- 
-   } 
-
        attroff(COLOR_PAIR(2)); 
        wrefresh(my_winlos);
-       //mvprintw(12, 2, "New names "); // 12  
-   
-      // another side
-       attron(COLOR_PAIR(2)); 
-      // mvprintw(1, (COLS/2) + 3, "new sides");       
+       attron(COLOR_PAIR(2));        
 
        refresh();
        wrefresh(my_winlos);
-       wrefresh(my_winlos2); 
-       char* nameTest = "simple.c";
-      // updateStatusWindow(nameTest);
-      // wrefresh(my_winStatus);    
-
+       wrefresh(my_winlos2);
 
  while(1) { 
    
     ch = getch();
-   //printf("KEY NAME : %s - %d\n", keyname(ch),ch);
+   
    if( ch == KEY_F(1)){
-  //   printw("F1 pressed ");
+
    } else {
    
    if(ch == KEY_LEFT){
-   //printw(" los key LEFT ");
+ 
    }
    
   if (ch == KEY_UP){
-    cSEle--;
-    updateLeftWindow(cwd);  
+ 
+   if( cSEle - 1 <= 0){
+     cSEle = 0;
+  }else {
+    cSEle--; 
+  }
+    
+    updateLeftWindow(cwd, false);  
  }  
  
   if (ch == KEY_DOWN){
-    cSEle++; 
-    updateLeftWindow(cwd); 
+  
+   if( cSEle + 1 >= currentLeftElementsInFolder){
+        cSEle =  currentLeftElementsInFolder;
+   } else {
+      cSEle++;
+   }    
+   
+    updateLeftWindow(cwd, false); 
   } 
  
   if( ch == 10 ){ // ENTER
-  
-  } 
+     
+         char tempCWD[256];
+         strncpy(tempCWD, cwd, sizeof(cwd));
+
+         strcat(tempCWD, "/");
+         strcat(tempCWD, cNamesSelected);
+         struct stat l_info;
+ 
+   
+     if ( strcmp(cNamesSelected, stringTwoDot) == 0 ){
+         char newCWD[256];
+         strncpy(newCWD, cwd, sizeof(cwd));    
+        
+          char* ptr1;
+          int ch = '/';
+          ptr1 = strrchr(newCWD, ch);        
+          char* nCWD;
+          strncat(nCWD, newCWD, strlen(cwd) - strlen(ptr1));
+          cSEle = 0;
+          updateLeftWindow(nCWD, true);
+      
+        } else if ( stat(tempCWD, &l_info) != 0){
+        
+        } else if(l_info.st_mode & S_IFDIR){
+                
+          
+     //int allocate = snprintf(NULL, 0, "%s", files->d_name);
+     //globalTime = malloc(allocate + 1);
+    // snprintf(globalTime, allocate + 1, "%s", files->d_name);
+      //  cwd = &tempCWD;
+       //  strcpy(cwd, tempCWD);
+         updateLeftWindow(tempCWD, true);     
+          
+       } else {
+          //  printf(" no this directory \n");
+       }
+        
+   } else 
+  {
+  }
+   
+ //if( stat(tempCWD, &l_info) == 0 && l_info.st_mode & S_IXUSR){
+     
+  //  pid_t forkLos;
+  //  forkLos = fork();
+
+  //if( forkLos == 0){
+  //  sleep(1);
+  //  char* args[] = {" test calling", NULL};
+     // "/home/loskutnikovlemp3/test22/./outLos"
+  //  execv(tempCWD, args);
+  // }  else if (forkLos != -1){
+  //wait(NULL);
+  //printf(" parent  precedure is now goint exit \n");
+
+ //  } else {
+ // printf("error occured is calling fork");
+ //  }
+ // } 
+// } 
 
   if( ch == 9 ){  // TAB
    
@@ -241,14 +265,14 @@ int main (void){
  
 //char* currentFiles1; // left window
 //char* currentFiles2; // right window
+
 char* currentFilesInFolders(char* nameFoldersPath, int numberFiles){
  
-   char* myName[numberFiles]; //= malloc(sizeof(char) * numberFiles);
-  // char* myName = (char*) calloc(numberFiles, sizeof(char[128]));
+   char* myName[numberFiles];
    struct dirent* files;
    DIR* dir = opendir(nameFoldersPath); // was "."
    if( dir == NULL ){
-    printf(" not open DIR ");
+    printw(" not open DIR ");
     return myName[0];
     }
 
@@ -259,7 +283,7 @@ char* currentFilesInFolders(char* nameFoldersPath, int numberFiles){
    i++;
     
   }
-    
+  closedir(dir);  
   return myName[0];
 }
 
@@ -268,83 +292,140 @@ char* currentFilesInFolders(char* nameFoldersPath, int numberFiles){
 
 char* returnFilesNames(char* path, int number ){
   
-   char* returnNamesString[1];  
-   char* globalMemoryString = (char*)calloc(2, sizeof(char*));
-   if(globalMemoryString == NULL ){
-     return ""; 
-  }  
- 
- 
-   struct dirent* files;
-   DIR* dir = opendir(path);
-   if( dir == NULL ){
-    printf(" not open DIR ");
-    return "";
-    }
+  // char* returnNamesString[1];  
+  // char* globalMemoryString = calloc(2, 16);
+  // if(globalMemoryString == NULL ){
+    // return ""; 
+ // }  
 
-   memset(globalMemoryString, '\0', 24);
+ 
+  //int allocate = snprintf(NULL, 0, "%s", ) 
+ 
+     char* globalTime;
+     struct dirent* files;
+     DIR* dir = opendir(path);
+    if( dir == NULL ){
+      printw(" not open DIR ");
+      return "";
+      }
+
+   //memset(globalMemoryString, '\0', 16);
+  
+    //char* globalMemoryString;  
+   int ii = 0;
+   while( (files = readdir(dir)) != NULL){
    
-  int ii = 0;
-  while( (files = readdir(dir)) != NULL){
-   if(ii == number){   
-   memcpy(globalMemoryString,files->d_name, 24);
-  }
-   
-   ii++;
-  }   
- return globalMemoryString; 
+   if(ii == number){ 
+  
+  // size_t mySize = strlen(files->d_name);
+  // char returnNamesString[mySize];
+   //globalMemoryString = calloc(mySize + 1, sizeof(char));
+ //  if(globalMemoryString == NULL ){
+   //  return "";
+  //}
+  
+     int allocate = snprintf(NULL, 0, "%s", files->d_name);  
+     globalTime = malloc(allocate + 1);
+     snprintf(globalTime, allocate + 1, "%s", files->d_name);
+ 
+  //  strcpy(globalMemoryString, files->d_name);
+    
+   //  memcpy(globalMemoryString,files->d_name, sizeof(files->d_name));
+    }
+     
+     ii++;
+    }   
+   closedir(dir); 
+    return globalTime;
+   //return globalMemoryString; 
  } 
 
 
-bool  updateLeftWindow(char* currentPath){
-   
-  int nStep = 0;
-//   char* leftListNames[100];
-//  char* rightListNames[100];
-   for(int i = 0; i < 100; i++){
-    leftListNames[i] = "\n";  
- }  
-    
-    //if(checkUpPathIsFolder(currentPath)){
-     leftListNames[0] = "..";
-  //}
-   
+bool  updateLeftWindow(char* currentPath, bool needUpdate){
   
-       mvprintw(1 + nStep, 2, "%s", leftListNames[0]);
-       nStep++;
+ 
+   int nStep = 0;
    
+  if(needUpdate){
+  
+ // currentLeftElementsInFolder
      
-      int number = currentNumberFilesInFolder(currentPath);   
-  
+     attron(COLOR_PAIR(2)); 
+    for(int d = 0; d < currentLeftElementsInFolder; d++) {
+     mvprintw(1 + nStep, 2, "%s", "");
+      nStep++;
+ }
 
-    // cSEle
-    for(int i = 0; i < number; i++){
-    char* currentNa = returnFilesNames(currentPath, i);
+     attroff(COLOR_PAIR(2));
+     wrefresh(my_winlos);
+     refresh();
+ }  
+     nStep = 0;   
     
+    
+    if(checkUpPathIsFolder(currentPath)){
+     leftListNames[0] = "..";
+     
+
+    if(cSEle == 0)  {
+    attron( COLOR_PAIR(1)); // was my_winlos  
+    mvprintw(1 + nStep, 2, "%s", leftListNames[0]);
+    attroff(COLOR_PAIR(1));
+     
+    cNamesSelected = leftListNames[0];
+    //updateStatusWindow(currentPath,);
+
+   } else {
+     attron(COLOR_PAIR(2));
+     mvprintw(1 + nStep, 2, "%s", leftListNames[0]);
+     attroff(COLOR_PAIR(2));
+   }   
+      nStep++;
+ }
+     
+  
+    int number = currentNumberFilesInFolder(currentPath);   
+  
+    // cSEle
+    // currentLeftElementsInFolder 
+
+    //printw(" my number %d and %d  \n", number , currentLeftElementsInFolder);
+    for(int i = 0; i < number; i++){
+    char* currentNa; 
+   if ( !needUpdate ){
+    currentNa = returnFilesNames(currentPath, i); 
+   }else {
+    currentNa = "sdfsdf";   
+    } 
+    
+    //  = returnFilesNames(currentPath, i);
+    // char* currentNa = "sdfsdf";
     if( strcmp(currentNa, stringTwoDot) == 0 ){
     }else if (strcmp(currentNa, stringDot) == 0) {
   } else {
      
      if(nStep == cSEle){
-    attron( COLOR_PAIR(1)); // was my_winlos
+     attron( COLOR_PAIR(1)); // was my_winlos
      mvprintw(1+nStep, 2, "%s", currentNa);
-    attroff(COLOR_PAIR(1));
+     attroff(COLOR_PAIR(1));
   
-    updateStatusWindow(currentPath,currentNa);
- 
+     updateStatusWindow(currentPath,currentNa);
+     cNamesSelected = currentNa;
+    // free(currentNa);
    }else {
      attron(COLOR_PAIR(2));   
-    mvprintw(1+nStep, 2, "%s", currentNa);
+     mvprintw(1+nStep, 2, "%s", currentNa);
      attroff(COLOR_PAIR(2));
+    // free(currentNa);
    }
      
-      
-   //  wbkgd(my_winlos, COLOR_PAIR(2));
+   // free (currentNa);
 
      nStep++;
    } 
  }
  
+ currentLeftElementsInFolder = nStep - 1;
   refresh();     
   wrefresh(my_winlos);
          
@@ -358,7 +439,7 @@ int currentNumberFilesInFolder(char* nameDirPath){
    struct dirent* files;
    DIR* dir = opendir(nameDirPath);
    if( dir == NULL ){
-    printf(" not open DIR ");
+    printw(" not open DIR ");
     return 0;
     }
 
@@ -368,14 +449,22 @@ int currentNumberFilesInFolder(char* nameDirPath){
    //printf("%s \n", files->d_name);
     numberFile++;
    }
- 
+
+  
+   closedir(dir);
  return numberFile;
  } 
 
 void DestroyALL(){
  
-
- }
+   wrefresh(my_winlos);
+   wrefresh(my_winlos2);
+   wrefresh(my_winStatus);
+   
+   delwin(my_winlos);
+   delwin(my_winlos2);
+   delwin(my_winStatus); 
+    }
 
 
 
@@ -398,10 +487,12 @@ void updateStatusWindow(char* cwd, char* name)
   stat(cwdTemp, &ta2);
   
    strftime(date, 20, "%d-%m-%y", localtime(&(ta2.st_ctime)));
-   mvprintw(LINES - 2, 2, "%s    %ldKB    %s ", name, ta2.st_size,date);
+   mvprintw(LINES - 2, 2, " %s    %ldKB    %s ", name, ta2.st_size,date);
 
    attroff(COLOR_PAIR(3));
-    wrefresh(my_winStatus);
+   //free (ptr2);
+   //free (ptr3);
+   wrefresh(my_winStatus);
 }
 
 
@@ -414,4 +505,13 @@ WINDOW* createa_newwin(int height, int width, int startX, int startY){
  wrefresh(local_win);
  return local_win; 
 }
+
+
+
+
+bool checkUpPathIsFolder(char* currentPath){
+    
+ 
+ return true;
+ }
 
